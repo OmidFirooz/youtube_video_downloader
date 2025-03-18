@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Downloader</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #1a1a2e, #16213e); color: #e0e0e0; min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .container { background: rgba(255, 255, 255, 0.05); border-radius: 15px; padding: 30px; max-width: 500px; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        h1 { text-align: center; font-size: 2rem; color: #00d4ff; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        form { display: flex; flex-direction: column; gap: 20px; }
+        label { font-size: 1rem; color: #b0b0b0; margin-bottom: 5px; }
+        input[type="text"], select { padding: 12px; font-size: 1rem; border: none; border-radius: 8px; background: rgba(255, 255, 255, 0.1); color: #1a1a2e; outline: none; transition: all 0.3s ease; }
+        input[type="text"]:focus, select:focus { background: rgba(255, 255, 255, 0.15); box-shadow: 0 0 10px rgba(0, 212, 255, 0.5); }
+        button { padding: 12px; font-size: 1rem; border: none; border-radius: 8px; background: #00d4ff; color: #1a1a2e; cursor: pointer; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+        button:hover { background: #00b8e6; box-shadow: 0 0 15px rgba(0, 212, 255, 0.7); transform: translateY(-2px); }
+        .error { text-align: center; color: #ff6b6b; font-size: 0.9rem; margin-top: 15px; padding: 10px; background: rgba(255, 107, 107, 0.1); border-radius: 8px; }
+        #loading { display: none; text-align: center; margin-top: 20px; }
+        .circle { width: 60px; height: 60px; border: 6px solid #00d4ff; border-top: 6px solid transparent; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto; }
+        #progress { font-size: 1.2rem; color: #00d4ff; margin-top: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>YouTube Downloader</h1>
+        <form id="download-form" method="POST" action="">
+            {% csrf_token %}
+            <div>
+                <label for="video_url">Enter YouTube URL</label>
+                <input type="text" id="video_url" name="video_url" placeholder="https://youtube.com/watch?v=...">
+            </div>
+            <div>
+                <label for="download_type">Download Type</label>
+                <select id="download_type" name="download_type">
+                    <option value="hd_video">HD Video (MP4)</option>
+                    <option value="low_video">Low Quality Video (MP4)</option>
+                    <option value="mp3">Audio Only (MP3)</option>
+                </select>
+            </div>
+            <button type="submit">Download</button>
+        </form>
+        {% if error %}
+            <p class="error">{{ error }}</p>
+        {% endif %}
+        {% if task_id %}
+            <div id="loading">
+                <div class="circle"></div>
+                <p id="progress">0%</p>
+            </div>
+        {% endif %}
+    </div>
+
+    <script>
+        {% if task_id %}
+            document.getElementById('download-form').style.display = 'none';
+            document.getElementById('loading').style.display = 'block';
+
+            function checkStatus() {
+                fetch('/status/{{ task_id }}/')
+                    .then(response => response.json())
+                    .then(data => {
+                        document.getElementById('progress').textContent = `${Math.round(data.progress)}%`;
+                        if (data.ready) {
+                            // Trigger download without redirecting
+                            const link = document.createElement('a');
+                            link.href = '/serve/{{ task_id }}/';
+                            link.download = ''; // Browser will use the filename from the server
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+
+                            // Reset the page after a short delay
+                            setTimeout(() => {
+                                document.getElementById('loading').style.display = 'none';
+                                document.getElementById('download-form').style.display = 'flex';
+                                document.getElementById('video_url').value = ''; // Clear input
+                            }, 1000); // 1-second delay to let download start
+                        } else {
+                            setTimeout(checkStatus, 1000);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('download-form').style.display = 'flex';
+                    });
+            }
+            checkStatus();
+        {% endif %}
+    </script>
+</body>
+</html>
